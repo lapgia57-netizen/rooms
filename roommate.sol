@@ -1,226 +1,392 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+
+HỢP ĐỒNG QUẢN LÝ NHÀ TRỌ GHÉP / Ở CHUNG NHIỀU NGƯỜI
+
+Mục tiêu:
+
+* Một chủ nhà quản lý một căn nhà.
+* Nhiều người thuê cùng ở chung.
+* Mỗi người phải đóng:
+    * Tiền cọc
+    * Tiền thuê hàng tháng
+* Có quỹ chung:
+    * Điện
+    * Nước
+    * Internet
+    * Vệ sinh
+* Có cơ chế biểu quyết:
+    * Đuổi người vi phạm
+    * Không đóng tiền
+    * Gây ảnh hưởng tới tập thể
+
+=========================================================
+*/
+
 contract SharedHousingAgreement {
-    address public landlord;
-    string public houseAddress;
 
-    uint256 public totalMonthlyRent; // wei
-    uint256 public securityDepositPerPerson; // wei
-    uint256 public leaseStart;
-    uint256 public leaseEnd;
+/*
+-----------------------------------------------------
+THÔNG TIN CHUNG CỦA CĂN NHÀ
+-----------------------------------------------------
+*/
+// Địa chỉ ví của chủ nhà
+address public landlord;
+// Địa chỉ căn nhà
+string public houseAddress;
+// Tổng tiền thuê cả căn mỗi tháng
+uint256 public totalMonthlyRent;
+// Tiền cọc mỗi người
+uint256 public securityDepositPerPerson;
+// Thời gian bắt đầu hợp đồng
+uint256 public leaseStart;
+// Thời gian kết thúc hợp đồng
+uint256 public leaseEnd;
+// Trạng thái hợp đồng
+bool public agreementActive;
+/*
+-----------------------------------------------------
+THÔNG TIN MỖI NGƯỜI THUÊ
+-----------------------------------------------------
+*/
+struct Roommate {
+    // Có còn ở trong nhà không
+    bool isActive;
+    // Đã đóng cọc chưa
+    bool depositPaid;
+    // Thời điểm tham gia
+    uint256 joinedAt;
+    // Tháng gần nhất đã đóng tiền thuê
+    uint256 lastRentPaidMonth;
+    // Số tiền cọc đã đóng
+    uint256 depositAmount;
+}
+/*
+Lưu thông tin roommate theo địa chỉ ví
+*/
+mapping(address => Roommate) public roommates;
+/*
+Danh sách tất cả roommate từng tham gia
+*/
+address[] public roommateList;
+/*
+-----------------------------------------------------
+QUỸ CHUNG
+-----------------------------------------------------
+*/
+// Tổng số tiền trong quỹ
+uint256 public commonFund;
+/*
+Theo dõi từng người đã đóng vào quỹ bao nhiêu
+*/
+mapping(address => uint256)
+    public commonFundContribution;
+/*
+-----------------------------------------------------
+HỆ THỐNG BỎ PHIẾU KICK
+-----------------------------------------------------
+*/
+/*
+kickVotes[target][voter]
+Ví dụ:
+A bỏ phiếu kick B
+kickVotes[B][A] = true
+*/
+mapping(address => mapping(address => bool))
+    public kickVotes;
+/*
+Số phiếu kick của mỗi người
+*/
+mapping(address => uint256)
+    public kickVoteCount;
+/*
+-----------------------------------------------------
+SỰ KIỆN (EVENT)
+-----------------------------------------------------
+*/
+event RoommateAdded(address roommate);
+event DepositPaid(
+    address roommate,
+    uint256 amount
+);
+event RentPaid(
+    address roommate,
+    uint256 amount,
+    uint256 month
+);
+event CommonFundDeposited(
+    address roommate,
+    uint256 amount
+);
+event BillPaidByLandlord(
+    uint256 amount,
+    string description
+);
+event RoommateKicked(
+    address roommate,
+    uint256 votes
+);
+event RoommateLeft(
+    address roommate,
+    uint256 depositReturned
+);
+event AgreementTerminated(
+    uint256 timestamp
+);
+/*
+-----------------------------------------------------
+MODIFIER
+-----------------------------------------------------
+*/
+// Chỉ chủ nhà
+modifier onlyLandlord() {
+    require(
+        msg.sender == landlord,
+        "Only landlord"
+    );
+    _;
+}
+// Chỉ roommate đang hoạt động
+modifier onlyActiveRoommate() {
+    require(
+        roommates[msg.sender].isActive,
+        "Not active roommate"
+    );
+    _;
+}
+// Hợp đồng còn hiệu lực
+modifier onlyActiveAgreement() {
+    require(
+        agreementActive,
+        "Agreement not active"
+    );
+    _;
+}
+/*
+-----------------------------------------------------
+KHỞI TẠO HỢP ĐỒNG
+-----------------------------------------------------
+*/
+constructor(
+    string memory _houseAddress,
+    uint256 _totalMonthlyRent,
+    uint256 _securityDepositPerPerson,
+    uint256 _leaseDurationInDays
+) {
+    landlord = msg.sender;
+    houseAddress = _houseAddress;
+    totalMonthlyRent =
+        _totalMonthlyRent;
+    securityDepositPerPerson =
+        _securityDepositPerPerson;
+    leaseStart =
+        block.timestamp;
+    leaseEnd =
+        block.timestamp +
+        (_leaseDurationInDays * 1 days);
+    agreementActive = true;
+}
+/*
+-----------------------------------------------------
+THÊM NGƯỜI THUÊ MỚI
+-----------------------------------------------------
+*/
+function addRoommate(
+    address _roommate
+)
+    external
+    onlyLandlord
+    onlyActiveAgreement
+{
+    /*
+    Chủ nhà thêm một thành viên mới
+    vào căn nhà.
+    */
+}
+/*
+-----------------------------------------------------
+ĐÓNG TIỀN CỌC
+-----------------------------------------------------
+*/
+function payDeposit()
+    external
+    payable
+{
+    /*
+    Roommate gửi đúng số tiền cọc.
+    Sau khi đóng:
+    - depositPaid = true
+    - lưu số tiền cọc
+    */
+}
+/*
+-----------------------------------------------------
+XÁC ĐỊNH THÁNG HIỆN TẠI
+-----------------------------------------------------
+*/
+function getCurrentMonth()
+    public
+    view
+    returns(uint256)
+{
+    /*
+    Ví dụ:
+    Tháng đầu tiên = 1
+    Sau 30 ngày = tháng 2
+    Sau 60 ngày = tháng 3
+    */
+}
+/*
+-----------------------------------------------------
+TÍNH TIỀN THUÊ MỖI NGƯỜI
+-----------------------------------------------------
+*/
+function getRentPerPerson()
+    public
+    view
+    returns(uint256)
+{
+    /*
+    Ví dụ:
+    Tiền nhà = 12 ETH
+    Có 4 người
+    => mỗi người 3 ETH
+    */
+}
+/*
+-----------------------------------------------------
+ĐÓNG TIỀN THUÊ THÁNG
+-----------------------------------------------------
+*/
+function payRent()
+    external
+    payable
+{
+    /*
+    Điều kiện:
+    - Đã đóng cọc
+    - Chưa đóng tháng hiện tại
+    Sau đó:
+    - Chuyển tiền cho chủ nhà
+    - Ghi nhận tháng đã thanh toán
+    */
+}
+/*
+-----------------------------------------------------
+ĐÓNG GÓP QUỸ CHUNG
+-----------------------------------------------------
+*/
+function contributeToCommonFund()
+    external
+    payable
+{
+    /*
+    Quỹ dùng cho:
+    - Điện
+    - Nước
+    - Wifi
+    - Dịch vụ chung
+    */
+}
+/*
+-----------------------------------------------------
+CHỦ NHÀ THANH TOÁN HÓA ĐƠN
+-----------------------------------------------------
+*/
+function payBillFromCommonFund(
+    uint256 amount,
+    string memory description
+)
+    external
+{
+    /*
+    Trừ tiền từ quỹ chung.
+    Ví dụ:
+    amount = 500000
+    description =
+    "Hoa don Internet thang 5"
+    */
+}
+/*
+-----------------------------------------------------
+BỎ PHIẾU ĐUỔI THÀNH VIÊN
+-----------------------------------------------------
+*/
+function voteToKick(
+    address target
+)
+    external
+{
+    /*
+    Mỗi roommate được bỏ phiếu
+    một lần cho mỗi người.
+    Nếu số phiếu > 50%
+    thì người đó bị kick.
+    */
+}
+/*
+-----------------------------------------------------
+THÀNH VIÊN TỰ RỜI ĐI
+-----------------------------------------------------
+*/
+function leaveRoom()
+    external
+{
+    /*
+    Điều kiện:
+    - Đã trả tiền tháng hiện tại
+    Sau đó:
+    - Trả lại tiền cọc
+    - Hủy trạng thái active
+    */
+}
+/*
+-----------------------------------------------------
+KẾT THÚC HỢP ĐỒNG
+-----------------------------------------------------
+*/
+function terminateAgreement()
+    external
+{
+    /*
+    Sau khi hết hạn thuê:
+    - Chủ nhà đóng hợp đồng
+    - Hoàn tiền cọc
+    - Kết thúc hệ thống
+    */
+}
+/*
+-----------------------------------------------------
+THỐNG KÊ
+-----------------------------------------------------
+*/
+/*
+Đếm số roommate còn hoạt động
+*/
+function getActiveRoommateCount()
+    public
+    view
+    returns(uint256)
+{}
+/*
+Trả về toàn bộ danh sách roommate
+*/
+function getRoommateList()
+    external
+    view
+    returns(address[] memory)
+{}
+/*
+Kiểm tra có đang nợ tiền nhà hay không
+*/
+function isRentOverdue(
+    address roommate
+)
+    external
+    view
+    returns(bool)
+{}
 
-    bool public agreementActive;
-
-    struct Roommate {
-        bool isActive;
-        bool depositPaid;
-        uint256 joinedAt;
-        uint256 lastRentPaidMonth; // 0 = chưa trả lần nào
-        uint256 depositAmount; // số tiền đã cọc
-    }
-
-    mapping(address => Roommate) public roommates;
-    address[] public roommateList;
-
-    uint256 public commonFund; // quỹ chung đóng điện nước
-    mapping(address => uint256) public commonFundContribution;
-
-    // Vote để kick người không trả tiền
-    mapping(address => mapping(address => bool)) public kickVotes; // kickVotes[target][voter]
-    mapping(address => uint256) public kickVoteCount;
-
-    event RoommateAdded(address indexed roommate);
-    event DepositPaid(address indexed roommate, uint256 amount);
-    event RentPaid(address indexed roommate, uint256 amount, uint256 forMonth);
-    event CommonFundDeposited(address indexed from, uint256 amount);
-    event BillPaidByLandlord(uint256 amount, string description);
-    event RoommateKicked(address indexed kicked, uint256 votes);
-    event RoommateLeft(address indexed roommate, uint256 depositReturned);
-    event AgreementTerminated(uint256 timestamp);
-
-    modifier onlyLandlord() {
-        require(msg.sender == landlord, "Only landlord");
-        _;
-    }
-
-    modifier onlyActiveRoommate() {
-        require(roommates[msg.sender].isActive, "Not active roommate");
-        _;
-    }
-
-    modifier onlyActiveAgreement() {
-        require(agreementActive, "Agreement not active");
-        _;
-    }
-
-    constructor(
-        string memory _houseAddress,
-        uint256 _totalMonthlyRent,
-        uint256 _securityDepositPerPerson,
-        uint256 _leaseDurationInDays
-    ) {
-        landlord = msg.sender;
-        houseAddress = _houseAddress;
-        totalMonthlyRent = _totalMonthlyRent;
-        securityDepositPerPerson = _securityDepositPerPerson;
-        leaseStart = block.timestamp;
-        leaseEnd = block.timestamp + (_leaseDurationInDays * 1 days);
-        agreementActive = true;
-    }
-
-    function addRoommate(address _roommate) external onlyLandlord onlyActiveAgreement {
-        require(_roommate!= address(0), "Invalid address");
-        require(!roommates[_roommate].isActive, "Already a roommate");
-
-        roommates[_roommate] = Roommate({
-            isActive: true,
-            depositPaid: false,
-            joinedAt: block.timestamp,
-            lastRentPaidMonth: 0,
-            depositAmount: 0
-        });
-
-        roommateList.push(_roommate);
-        emit RoommateAdded(_roommate);
-    }
-
-    function payDeposit() external payable onlyActiveRoommate onlyActiveAgreement {
-        Roommate storage r = roommates[msg.sender];
-        require(!r.depositPaid, "Deposit already paid");
-        require(msg.value == securityDepositPerPerson, "Incorrect deposit amount");
-
-        r.depositPaid = true;
-        r.depositAmount = msg.value;
-        emit DepositPaid(msg.sender, msg.value);
-    }
-
-    function getCurrentMonth() public view returns (uint256) {
-        return (block.timestamp - leaseStart) / 30 days + 1;
-    }
-
-    function getRentPerPerson() public view returns (uint256) {
-        uint256 activeCount = getActiveRoommateCount();
-        require(activeCount > 0, "No active roommates");
-        return totalMonthlyRent / activeCount;
-    }
-
-    function payRent() external payable onlyActiveRoommate onlyActiveAgreement {
-        Roommate storage r = roommates[msg.sender];
-        require(r.depositPaid, "Pay deposit first");
-
-        uint256 currentMonth = getCurrentMonth();
-        require(r.lastRentPaidMonth < currentMonth, "Rent for this month already paid");
-
-        uint256 rentDue = getRentPerPerson();
-        require(msg.value == rentDue, "Incorrect rent amount");
-
-        r.lastRentPaidMonth = currentMonth;
-
-        (bool sent, ) = landlord.call{value: msg.value}("");
-        require(sent, "Failed to send rent to landlord");
-
-        emit RentPaid(msg.sender, msg.value, currentMonth);
-    }
-
-    function contributeToCommonFund() external payable onlyActiveRoommate {
-        require(msg.value > 0, "Must send ETH");
-        commonFund += msg.value;
-        commonFundContribution[msg.sender] += msg.value;
-        emit CommonFundDeposited(msg.sender, msg.value);
-    }
-
-    function payBillFromCommonFund(uint256 _amount, string memory _description)
-        external
-        onlyLandlord
-    {
-        require(_amount <= commonFund, "Not enough in common fund");
-        commonFund -= _amount;
-
-        (bool sent, ) = landlord.call{value: _amount}("");
-        require(sent, "Failed to pay bill");
-
-        emit BillPaidByLandlord(_amount, _description);
-    }
-
-    function voteToKick(address _target) external onlyActiveRoommate {
-        require(roommates[_target].isActive, "Target not active");
-        require(_target!= msg.sender, "Cannot vote yourself");
-        require(!kickVotes[_target][msg.sender], "Already voted");
-
-        kickVotes[_target][msg.sender] = true;
-        kickVoteCount[_target]++;
-
-        uint256 activeCount = getActiveRoommateCount();
-        // Cần > 50% vote để kick
-        if (kickVoteCount[_target] * 2 > activeCount) {
-            _kickRoommate(_target);
-        }
-    }
-
-    function _kickRoommate(address _target) internal {
-        roommates[_target].isActive = false;
-        // Mất cọc nếu bị kick vì không trả tiền
-        emit RoommateKicked(_target, kickVoteCount[_target]);
-    }
-
-    function leaveRoom() external onlyActiveRoommate {
-        Roommate storage r = roommates[msg.sender];
-        uint256 currentMonth = getCurrentMonth();
-        require(r.lastRentPaidMonth >= currentMonth, "Pay current month rent first");
-
-        r.isActive = false;
-        uint256 depositToReturn = r.depositAmount;
-        r.depositAmount = 0;
-
-        if (depositToReturn > 0) {
-            (bool sent, ) = msg.sender.call{value: depositToReturn}("");
-            require(sent, "Failed to return deposit");
-        }
-
-        emit RoommateLeft(msg.sender, depositToReturn);
-    }
-
-    function terminateAgreement() external onlyLandlord {
-        require(block.timestamp >= leaseEnd, "Lease not ended yet");
-        agreementActive = false;
-
-        // Trả cọc cho tất cả roommate còn active
-        for (uint i = 0; i < roommateList.length; i++) {
-            address rAddr = roommateList[i];
-            if (roommates[rAddr].isActive && roommates[rAddr].depositAmount > 0) {
-                uint256 amount = roommates[rAddr].depositAmount;
-                roommates[rAddr].depositAmount = 0;
-                (bool sent, ) = rAddr.call{value: amount}("");
-                require(sent, "Failed to return deposit");
-            }
-        }
-
-        emit AgreementTerminated(block.timestamp);
-    }
-
-    function getActiveRoommateCount() public view returns (uint256 count) {
-        for (uint i = 0; i < roommateList.length; i++) {
-            if (roommates[roommateList[i]].isActive) {
-                count++;
-            }
-        }
-    }
-
-    function getRoommateList() external view returns (address[] memory) {
-        return roommateList;
-    }
-
-    function isRentOverdue(address _roommate) external view returns (bool) {
-        if (!roommates[_roommate].isActive) return false;
-        uint256 currentMonth = getCurrentMonth();
-        // Cho phép trễ 5 ngày
-        uint256 dueDate = leaseStart + (currentMonth * 30 days);
-        return block.timestamp > dueDate + 5 days &&
-               roommates[_roommate].lastRentPaidMonth < currentMonth;
-    }
-
-    receive() external payable {
-        revert("Use specific functions");
-    }
 }
